@@ -9,7 +9,7 @@ This has not been fully tested for functionality or for security.  Use at your o
 
 # Firebase setup.
 This assumes a Firebase account and firestore database has been set up with a 'tasks' collection, with some tasks as shown in the image below:
-![Database Tasks Example](./doc/database tasks example.png)
+![Database Tasks Example](/doc/database-tasks-example.png)
 An external file is used for firebase credentials in order to allow for CDN publishing.  These can be directly substituted as desired with your own credentials.
 The external file is called firebaseConfig.js, and is as follows:
 ```
