@@ -19,7 +19,14 @@
   
   <!-- Custom styling goes here... -->
   <style type="text/css">
+    .todo-incomplete {
+      color: dimgrey;
+    }
 
+    .todo-complete {
+      color: dimgrey;
+      text-decoration: line-through;
+    }
 
   </style>
 </head>
@@ -41,7 +48,7 @@
         <ul>
           <li v-for="item in scripts">{{ item.name }} - {{ item.description }}</li>
         </ul>
-        <h3>Styles</h3>
+        <h3>Styling</h3>
         <ul>
           <li v-for="item in styles">{{ item.name }} - {{ item.description }}</li>
         </ul>
@@ -50,11 +57,12 @@
     <div class="row">
       <div class="col">
         <h1>Firebase Area</h1>
-        <div v-if="user">
+        <div v-if="user" class="mb-3">
+          <h2>User Auth</h2>
           <div class="alert alert-success">Logged in as {{ user.email || user.uid }}</div>
           <div class="btn btn-secondary" @click="signOut">Sign Out</div>
         </div>
-        <div v-else>
+        <div v-else class="mb-3">
           <div class="form-group mb-3">
             <label class="form-label">E-mail</label>
             <input type="email" class="form-control" v-model="userForm.email" placeholder="me@example.com">
@@ -65,10 +73,40 @@
           </div>
           <div class="btn btn-primary mb-3" @click="signIn">Sign In</div>
         </div>
+        <div v-if="user">
+          <h2>Data Example - Task List</h2>
+          <p>This uses a VueJS component that displays data drawn from the Firebase database.</p>
+          <!-- Below, the tasks data is bound to the parent component, and accessed in the child component using 'props' -->
+          <task-list :tasks="tasks"></task-list>
+        </div>
+      </div>
+    </div>
+    <div class="row todo">
+      <div class="col">
+        <h1>Page ToDo</h1>
+        <ul>
+          <li v-for="todo in todos" :class="todo.status">{{ todo.text }} <span v-if="todo.completedBy" class="badge bg-secondary">Done - {{ todo.completedBy }}</span></li>
+        </ul>
       </div>
     </div>
   </div>
-  
+
+  <!-- ******************* TEMPLATES ******************** -->
+  <!-- These are the templates for the VueJS components, allowing separation of concerns -->
+  <!-- Tasks list template -->
+  <script type="text/html" id="tasks-template">
+    <div>
+      <h1 class="tasklist-heading">Tasks List</h1>
+      <div v-for="task in tasks"><task-item :task="task"></task-item></div>
+    </div>
+  </script>
+
+  <!-- Task item template (for each item in the task list)-->
+  <script type="text/html" id="task-item-template">
+    <div class="alert alert-secondary">
+      <div>{{ task.text }}<div class="float-end">x</div></div>
+    </div>
+  </script>
   
   <!-- ******************** SCRIPTS ********************* -->
   <!-- Custom scripts if needed -->
@@ -91,7 +129,7 @@
 
     // Add Firebase products that you want to use
     import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/9.6.2/firebase-auth.js'
-    // import { firestore } from 'https://www.gstatic.com/firebasejs/9.6.2/firebase-firestore.js'
+    import { getFirestore, collection, getDocs, onSnapshot } from 'https://www.gstatic.com/firebasejs/9.6.2/firebase-firestore.js'
 
     // Firebase configuration
     // The firebase config is loaded externally from js file such as: 
@@ -115,10 +153,11 @@
     // Initialize Firebase
     const firebaseApp = initializeApp(firebaseConfig);
     
+    // Firebase Auth
     const auth = getAuth();
 
     // VueJS initialisation
-    const vueApp = {
+    const vueApp = Vue.createApp({
       data () {
         return {
           auth: null,
@@ -127,6 +166,7 @@
             email: null,
             password: null
           },
+          unsubscribe: null,
           scripts: [
             {
               name: 'VueJS 3',
@@ -135,7 +175,7 @@
             },
             {
               name: 'Firebase',
-              description: ''
+              description: 'A serverless, real-time database, backed by Google'
             }
           ],
           styles: [
@@ -143,6 +183,15 @@
               name: 'Bootstrap 5',
               description: 'Responsive front-end styling toolkit'
             }
+          ],
+          tasks: [
+          ],
+          todos: [
+            { text: 'Firebase delete function for tasks list', status: 'todo-incomplete' },
+            { text: 'Firebase "Add task" form and function', status: 'todo-incomplete' },
+            { text: 'Styling for tasks list', status: 'todo-incomplete' },
+            { text: 'Overall page design', status: 'todo-incomplete' },
+            { text: 'Demonstrate todo completion', status: 'todo-complete', completedBy: 'PR' }
           ]
         }
       },
@@ -151,7 +200,7 @@
           signInWithEmailAndPassword(auth, this.userForm.email, this.userForm.password).then((credential) => {
             console.log(credential)
           }).catch((error) => {
-            consoel.log(error)
+            console.log(error)
           })
         },
         signOut: function () {
@@ -159,7 +208,7 @@
         }
       },
       mounted () {
-        // Firebase auth checking....
+        // Firebase auth checking.  Each time there is a change to the user state, the onAuthStateChanged method is fired
         // .. from https://firebase.google.com/docs/web/pwa
         onAuthStateChanged(auth, (user) => {
           if (user) {
@@ -173,10 +222,56 @@
             this.user = null;
           }
         });
-      }
-    }
 
-    Vue.createApp(vueApp).mount('#app')
+        // Get data from our data store (Firebase firestore)
+        // Load-once (non-realtime initial load)
+        /*
+        const getTasks = async () => {
+          const queryData = await getDocs(collection(getFirestore(), 'tasks'));
+          this.tasks = []
+          queryData.forEach((doc) => {
+            console.log(doc.id, doc.data())
+            this.tasks.push(doc.data())
+          })
+        }
+        */
+        // Realtime updates:
+        const getTasks = () => {
+          this.unsubscribe = onSnapshot(collection(getFirestore(), 'tasks'), (queryData) => {
+            this.tasks = [];
+            queryData.forEach((doc) => {
+              this.tasks.push({ text: doc.data().text, id: doc.id })
+            })
+          })
+        }
+        getTasks();
+      },
+      beforeUnmount () {
+        this.unsubscribe();
+      }
+    });
+
+    // VueJS component - TaskList
+    vueApp.component( 'task-list', {
+      data () {
+        return {
+        }
+      },
+      props: ['tasks'],
+      template: '#tasks-template'
+    });
+
+    // VueJS component - TaskList
+    vueApp.component( 'task-item', {
+      data () {
+        return {
+        }
+      },
+      props: ['task'],
+      template: '#task-item-template'
+    });
+
+    vueApp.mount('#app')
   </script>
 </body>
 
